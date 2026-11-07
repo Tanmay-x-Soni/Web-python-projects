@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hangman</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#1b1f3b; --night:#2a2766; --key:#e9ecff; --key-edge:#9aa2e8;
+  --hit:#3ddc97; --hit-edge:#1f9a68; --miss:#ff6b6b; --miss-edge:#b83f3f;
+  --sun:#ffd166; --wood:#c98b4e; --text:#f5f3ff; --dim:#b8b6e0;
+  --font:"Fredoka","Trebuchet MS",system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;font-family:var(--font);color:var(--text);
+  background:linear-gradient(160deg,var(--ink),var(--night));display:grid;place-items:center;padding:1rem}
+.app{width:100%;max-width:920px}
+header{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:1rem}
+h1{margin:0;font-size:2rem;font-weight:700;letter-spacing:.02em}
+.hearts{font-size:1.6rem;letter-spacing:.15em;color:var(--miss)}
+.hearts .lost{color:#ffffff30}
+.btn{font:inherit;font-weight:600;cursor:pointer;border:0;border-radius:12px;padding:.6rem 1.1rem;
+  color:var(--ink);background:var(--sun);box-shadow:0 4px 0 #b8902f}
+.btn:active{transform:translateY(3px);box-shadow:0 1px 0 #b8902f}
+.board{display:grid;gap:1.5rem;grid-template-columns:1fr}
+@media(min-width:760px){.board{grid-template-columns:5fr 6fr;align-items:center}}
+.scene{background:#ffffff0f;border-radius:20px;padding:1rem}
+svg{display:block;width:100%;max-height:340px}
+.wood{stroke:var(--wood);stroke-width:8;stroke-linecap:round;fill:none}
+.part{stroke:var(--text);stroke-width:7;stroke-linecap:round;fill:none;
+  stroke-dasharray:1;stroke-dashoffset:1}
+.part.on{stroke-dashoffset:0}
+.ready .part{transition:stroke-dashoffset .45s ease-out}
+.eyes{stroke:var(--miss);stroke-width:3;stroke-linecap:round;opacity:0}
+.dead .eyes{opacity:1}
+.word{display:flex;flex-wrap:wrap;gap:.45rem;margin:0 0 1rem;min-height:3.6rem}
+.tile{width:clamp(2.1rem,8vw,3rem);height:clamp(2.7rem,10vw,3.6rem);display:grid;place-items:center;
+  font-size:clamp(1.5rem,6vw,2.1rem);font-weight:700;text-transform:uppercase;color:var(--sun);
+  background:#ffffff14;border-bottom:4px solid var(--dim);border-radius:8px 8px 4px 4px}
+.tile.pop{animation:pop .3s ease-out}
+@keyframes pop{50%{transform:translateY(-8px) scale(1.12)}}
+.msg{min-height:1.6rem;margin:0 0 1rem;color:var(--sun);font-size:1.1rem}
+.kb{display:flex;flex-direction:column;gap:.45rem;align-items:center}
+.row{display:flex;gap:.35rem;justify-content:center}
+.key{font:inherit;font-weight:600;font-size:1.15rem;text-transform:uppercase;cursor:pointer;
+  width:clamp(1.9rem,8.2vw,2.8rem);height:clamp(2.5rem,10vw,3.2rem);border:0;border-radius:10px;
+  color:var(--ink);background:var(--key);box-shadow:0 4px 0 var(--key-edge)}
+.key:active:not(:disabled){transform:translateY(3px);box-shadow:0 1px 0 var(--key-edge)}
+.key.hit{background:var(--hit);box-shadow:0 4px 0 var(--hit-edge)}
+.key.miss{background:var(--miss);box-shadow:0 4px 0 var(--miss-edge)}
+.key:disabled{cursor:default}
+.key:not(.hit):not(.miss):disabled{opacity:.5}
+:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
+.overlay{position:fixed;inset:0;display:none;place-items:center;background:#0e1030cc;padding:1rem}
+.overlay.show{display:grid}
+.modal{background:var(--night);border:3px solid var(--sun);border-radius:24px;padding:2rem;
+  text-align:center;max-width:380px;width:100%}
+.modal h2{margin:0 0 .5rem;font-size:2rem}
+.modal .reveal{font-size:2.2rem;font-weight:700;color:var(--sun);text-transform:uppercase;margin:.5rem 0 1.5rem}
+@media(prefers-reduced-motion:reduce){.ready .part{transition:none}.tile.pop{animation:none}}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header>
+    <h1>Hangman</h1>
+    <div class="hearts" id="hearts" aria-live="polite"></div>
+    <button class="btn" id="newBtn" type="button">New word</button>
+  </header>
+
+  <div class="board">
+    <div class="scene">
+      <svg id="scene" viewBox="0 0 240 280" role="img" aria-label="Hangman drawing">
+        <line class="wood" x1="20" y1="262" x2="140" y2="262"/>
+        <line class="wood" x1="60" y1="262" x2="60" y2="30"/>
+        <line class="wood" x1="60" y1="30" x2="170" y2="30"/>
+        <line class="wood" x1="60" y1="75" x2="105" y2="30"/>
+        <line class="wood" x1="170" y1="30" x2="170" y2="68" style="stroke-width:4"/>
+        <circle class="part" pathLength="1" cx="170" cy="90" r="22"/>
+        <line class="part" pathLength="1" x1="170" y1="112" x2="170" y2="190"/>
+        <line class="part" pathLength="1" x1="170" y1="135" x2="144" y2="165"/>
+        <line class="part" pathLength="1" x1="170" y1="135" x2="196" y2="165"/>
+        <line class="part" pathLength="1" x1="170" y1="190" x2="148" y2="235"/>
+        <line class="part" pathLength="1" x1="170" y1="190" x2="192" y2="235"/>
+        <g class="eyes"><path d="M158 82l8 8M166 82l-8 8M174 82l8 8M182 82l-8 8"/></g>
+      </svg>
+    </div>
+
+    <div class="play">
+      <div class="word" id="word" aria-label="Word to guess"></div>
+      <p class="msg" id="msg" role="status" aria-live="polite"></p>
+      <div class="kb" id="kb"></div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-labelledby="ovTitle">
+  <div class="modal">
+    <h2 id="ovTitle"></h2>
+    <div id="ovText"></div>
+    <div class="reveal" id="ovWord"></div>
+    <button class="btn" id="againBtn" type="button">Play again</button>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const ROWS = ["qwertyuiop", "asdfghjkl", "zxcvbnm"];
+let state = null, busy = false, overlayTimer = null;
+
+async function api(path, method = "GET", body) {
+  const res = await fetch(path, {
+    method,
+    headers: {"Content-Type": "application/json"},
+    body: body ? JSON.stringify(body) : undefined
+  });
+  if (!res.ok) throw new Error("Request failed");
+  return res.json();
+}
+
+function buildKeyboard() {
+  const kb = $("#kb");
+  ROWS.forEach(r => {
+    const row = document.createElement("div");
+    row.className = "row";
+    [...r].forEach(ch => {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "key"; b.dataset.k = ch;
+      b.textContent = ch; b.setAttribute("aria-label", "Letter " + ch.toUpperCase());
+      b.addEventListener("click", () => guess(ch));
+      row.appendChild(b);
+    });
+    kb.appendChild(row);
+  });
+}
+
+function render(s) {
+  const prev = state;
+  state = s;
+
+  // word tiles
+  const wordEl = $("#word");
+  if (!prev || wordEl.children.length !== s.letters.length) {
+    wordEl.innerHTML = "";
+    s.letters.forEach(() => { const t = document.createElement("div"); t.className = "tile"; wordEl.appendChild(t); });
+  }
+  [...wordEl.children].forEach((t, i) => {
+    const was = t.textContent, now = s.letters[i] || (s.word ? s.word[i] : "");
+    t.textContent = now;
+    if (!was && s.letters[i]) { t.classList.remove("pop"); void t.offsetWidth; t.classList.add("pop"); }
+  });
+
+  // gallows parts
+  const wrongCount = s.maxLives - s.lives;
+  document.querySelectorAll(".part").forEach((p, i) => p.classList.toggle("on", i < wrongCount));
+  $("#scene").classList.toggle("dead", s.status === "lost");
+
+  // hearts, message, keys
+  $("#hearts").innerHTML = Array.from({length: s.maxLives}, (_, i) =>
+    `<span class="${i < s.lives ? "" : "lost"}">♥</span>`).join("");
+  $("#hearts").setAttribute("aria-label", s.lives + " of " + s.maxLives + " lives left");
+  $("#msg").textContent = s.status === "playing" ? s.message : (s.status === "won" ? "You got it!" : "Out of lives.");
+  document.querySelectorAll(".key").forEach(k => {
+    const ch = k.dataset.k, tried = s.guessed.includes(ch);
+    k.disabled = tried || s.status !== "playing";
+    k.classList.toggle("miss", s.wrong.includes(ch));
+    k.classList.toggle("hit", tried && !s.wrong.includes(ch));
+  });
+
+  // result dialog
+  clearTimeout(overlayTimer);
+  if (s.status === "playing") {
+    $("#overlay").classList.remove("show");
+  } else {
+    overlayTimer = setTimeout(() => {
+      $("#ovTitle").textContent = s.status === "won" ? "You win!" : "Game over";
+      $("#ovText").textContent = s.status === "won"
+        ? `You finished with ${s.lives} of ${s.maxLives} lives left. The word was`
+        : "The word was";
+      $("#ovWord").textContent = s.word;
+      $("#overlay").classList.add("show");
+      $("#againBtn").focus();
+    }, 700);
+  }
+}
+
+async function guess(ch) {
+  if (busy || !state || state.status !== "playing" || state.guessed.includes(ch)) return;
+  busy = true;
+  try { render(await api("/api/guess", "POST", {letter: ch})); }
+  catch { $("#msg").textContent = "Connection problem. Try again."; }
+  busy = false;
+}
+
+async function newGame() {
+  if (busy) return;
+  busy = true;
+  try { render(await api("/api/new", "POST")); $("#newBtn").blur(); }
+  catch { $("#msg").textContent = "Could not start a new game."; }
+  busy = false;
+}
+
+document.addEventListener("keydown", e => {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (/^[a-z]$/i.test(e.key) && !$("#overlay").classList.contains("show")) guess(e.key.toLowerCase());
+});
+$("#newBtn").addEventListener("click", newGame);
+$("#againBtn").addEventListener("click", newGame);
+
+buildKeyboard();
+api("/api/state").then(s => {
+  render(s);
+  requestAnimationFrame(() => $("#app").classList.add("ready"));
+}).catch(() => { $("#msg").textContent = "Could not load the game. Refresh the page."; });
+</script>
+</body>
+</html>
